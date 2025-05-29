@@ -1,0 +1,7 @@
+- name: Provisionar VM no servidor remoto
+  hosts: "IP host Ansible"
+  remote_user: root 
+  become: true  # Se necessário, para rodar como root
+  tasks:
+    - name: Executando tarefa no servidor remoto
+      command: echo "Tarefa executada com sucesso!"

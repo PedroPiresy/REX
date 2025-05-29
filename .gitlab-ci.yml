@@ -1,0 +1,160 @@
+stages:
+  - provision
+
+variables:
+  ANSIBLE_HOST_KEY_CHECKING: "False"
+
+  UNIQUE_ID: "${CI_JOB_ID}" # Variável para gerar caminhos únicos
+  TEMP_DIR_REMOTE: "/tmp/provision-${CI_JOB_ID}" # Diretório único no servidor remoto
+
+  RHEV_URL:
+    description: "URL do ambiente de virtualização."
+    value: "Selecione o ENGINE"
+    options:
+      - "Selecione o ENGINE"
+      - "https://engine-url-1.example.com/ovirt-engine/api"
+      - "https://engine-url-2.example.com/ovirt-engine/api"
+      - "https://engine-url-3.example.com/ovirt-engine/api"
+      - "https://engine-url-4.example.com/ovirt-engine/api"
+      - "https://engine-url-5.example.com/ovirt-engine/api"
+
+  VM_NAME:
+    description: "Nome de Host para a máquina virtual."
+    value: "Definir Hostname Aqui !"
+
+  TEMPLATE:
+    description: "Modelo de sistema operacional para a VM."
+    value: "null"
+    options:
+      - "null"
+      - "Debian11_iac"
+      - "Debian12_iac"
+      - "RedHat7_iac"
+      - "RedHat8_iac"
+      - "Ubuntu20_iac"
+      - "Ubuntu22_iac"
+
+  CPU_CORES:
+    description: "Número de núcleos de CPU."
+    value: "0"
+    options:
+      - "0"
+      - "1"
+      - "2"
+      - "4"
+      - "6"
+      - "8"
+      - "10"
+      - "12"
+      - "24"
+      - "32"
+
+  RAM:
+    description: "Quantidade de memória RAM."
+    value: "1 GiB"
+    options:
+      - "1 GiB"
+      - "2 GiB"
+      - "4 GiB"
+      - "8 GiB"
+      - "16 GiB"
+      - "32 GiB"
+      - "64 GiB"
+      - "128 GiB"
+
+  HD_1:
+    description: "Tamanho do disco rígido 1."
+    value: "20 GiB"
+    options:
+      - "20 GiB"
+      - "30 GiB"
+      - "40 GiB"
+      - "50 GiB"
+      - "60 GiB"
+      - "70 GiB"
+      - "80 GiB"
+
+  HD_2:
+    description: "Tamanho do disco rígido 2."
+    value: "0"
+    options:
+      - "0"
+      - "20 GiB"
+      - "30 GiB"
+      - "40 GiB"
+      - "50 GiB"
+      - "60 GiB"
+      - "70 GiB"
+      - "80 GiB"
+      - "90 GiB"
+      - "100 GiB"
+
+  VLAN:
+    description: "VLAN primária da VM."
+    value: "null"
+    options:
+      - "null"
+      - "RMI"
+      - "HML"
+      - "HML_OLVM"
+      - "PRD"
+      - "PRD_OLVM"
+
+  VLAN_SECUNDARIA:
+    description: "VLAN secundária da VM (se necessário)."
+    value: "null"
+    options:
+      - "null"
+      - "RMI"
+
+before_script:
+  - echo "Baixando repositório..."
+  - git clone https://example.com/toolkit/provision.git "/home/gitlab-runner/provision-${CI_JOB_ID}/"
+
+provision_vm:
+  stage: provision
+  script:
+    - echo "Validando variáveis necessárias..."
+    - |
+      if [ -z "$RHEV_URL" ] || [ -z "$RHEV_USERNAME" ] || [ -z "$RHEV_PASSWORD" ]; then
+        echo "Erro: Variáveis obrigatórias não configuradas."
+        exit 1
+      fi
+    - echo "Preparando ambiente remoto..."
+    - |
+      ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no user@remote-host <<EOF
+      echo "Configuração inicial no host remoto."
+      EOF
+    - echo "Transferindo repositório..."
+    - scp -rp "/home/gitlab-runner/provision-${CI_JOB_ID}/" user@remote-host:/tmp/
+    - echo "Gerando arquivo JSON de variáveis..."
+    - |
+      ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no user@remote-host <<EOF
+      cat <<EOV > ${TEMP_DIR_REMOTE}/pipeline/variables.json
+      {
+        "rhev_url": "$RHEV_URL",
+        "rhev_username": "$RHEV_USERNAME",
+        "rhev_password": "$RHEV_PASSWORD",
+        "vm_name": "$VM_NAME",
+        "cpu_cores": $CPU_CORES,
+        "ambiente": "$VLAN",
+        "ambiente1": "$VLAN_SECUNDARIA",
+        "memory": "$RAM",
+        "disk1": "$HD_1",
+        "disk2": "$HD_2",
+        "template": "$TEMPLATE"
+      }
+      EOV
+      EOF
+    - echo "Executando Playbook Ansible..."
+    - |
+      ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no user@remote-host <<EOF
+      cd ${TEMP_DIR_REMOTE}
+      ansible-playbook -i ansible/inventory/inventory.yml \
+        ansible/playbooks/provision_vm.yml --extra-vars @pipeline/variables.json -vvvv
+      EOF
+  environment:
+    name: $CI_COMMIT_REF_NAME
+  only:
+    - main
+    - tags

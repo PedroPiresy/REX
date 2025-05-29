@@ -1,0 +1,138 @@
+---
+- name: Provisionar e reiniciar VM no RHEV
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - ../vars/vlan.yml
+    - ../vars/storage_domains.yml
+  pre_tasks:
+    - name: Definir lista de Storage Domains baseada na URL
+      set_fact:
+        search_queries: |-
+          {% if rhev_url == 'https://engine/ovirt-engine/api' %}
+            {{ search_queries_engine | list }}
+          {% elif rhev_url == 'https://engine2/ovirt-engine/api' %}
+            {{ search_queries_engine1 | list }}
+          {% elif rhev_url == 'https://engine3/ovirt-engine/api' %}
+            {{ search_queries_olvm | list }}
+          {% elif rhev_url == 'https://engine3/ovirt-engine/api' %}
+            {{ search_queries_olvm1 | list }}
+          {% elif rhev_url == 'https://engine4/ovirt-engine/api' %}
+            {{ search_queries_olvm2 | list }}      
+          {% else %}
+            []
+          {% endif %}
+    - name: Corrigir formato de search_queries (converter para lista)
+      set_fact:
+        search_queries: "{{ search_queries | regex_replace('\\s+', '') | from_yaml }}"
+    - name: Exibir conteúdo de search_queries (debug)
+      debug:
+        var: search_queries
+    - name: Obter lista de Storage Domains com filtro
+      ovirt.ovirt.ovirt_storage_domain_info:
+        auth:
+          url: "{{ rhev_url }}"
+          username: "{{ rhev_username }}"
+          password: "{{ rhev_password }}"
+          insecure: true
+        pattern: "{{ item }}"
+      loop: "{{ search_queries }}"
+      register: storage_domains
+    - name: Identificar Storage Domain com maior espaço disponível
+      set_fact:
+        storage_domain_com_mais_espaco: "{{ (storage_domains.results |
+          map(attribute='ovirt_storage_domains') | flatten) |
+          sort(attribute='available') | last }}"
+    - name: Exibir o Storage Domain com mais espaço disponível
+      debug:
+        msg: "O Storage Domain com mais espaço disponível é: {{
+          storage_domain_com_mais_espaco.name }} com {{
+          (storage_domain_com_mais_espaco.available / 1024 / 1024 / 1024) |
+          round(2) }} GB"
+  tasks:
+    - name: Configurando VM
+      ovirt.ovirt.ovirt_vm:
+        auth:
+          url: "{{ rhev_url }}"
+          username: "{{ rhev_username }}"
+          password: "{{ rhev_password }}"
+          insecure: true
+        name: "{{ vm_name }}"
+        cluster: Default
+        memory: "{{ memory }}"
+        memory_guaranteed: "{{ memory }}"
+        memory_max: "{{ memory }}"
+        cpu_cores: "{{ cpu_cores }}"
+        cpu_sockets: 1
+        template: "{{ template }}"
+        nics: "{{ (nics_config[ambiente] | default([])) + (nics_config[ambiente1] |
+          default([])) }}"
+        timezone: America/Sao_Paulo
+        operating_system: other_linux
+        graphical_console:
+          protocol:
+            - vnc
+          keyboard_layout: pt-br
+        bios_type: q35_sea_bios
+        storage_domain: "{{ storage_domain_com_mais_espaco.name }}"
+        state: present
+      register: vm
+    - name: Expandir disco principal da VM
+      ovirt.ovirt.ovirt_disk:
+        auth:
+          url: "{{ rhev_url }}"
+          username: "{{ rhev_username }}"
+          password: "{{ rhev_password }}"
+          insecure: true
+        vm_name: "{{ vm_name }}"
+        name: "{{ template }}_Disk1"
+        size: "{{ disk1 }}"
+        state: present
+      when: vm.changed
+      register: disk_expanded
+    - name: Criar segundo disco (se disk2 for definido)
+      ovirt.ovirt.ovirt_disk:
+        auth:
+          url: "{{ rhev_url }}"
+          username: "{{ rhev_username }}"
+          password: "{{ rhev_password }}"
+          insecure: true
+        vm_name: "{{ vm_name }}"
+        name: "{{ template }}_Disk2"
+        size: "{{ disk2 }}"
+        interface: virtio
+        format: raw
+        storage_domain: "{{ storage_domain_com_mais_espaco.name }}"
+        state: present
+      when: disk2 is defined and (disk2 | regex_replace('[^0-9]', '') | int) > 0
+      register: second_disk
+    - name: Iniciar a VM
+      ovirt.ovirt.ovirt_vm:
+        auth:
+          url: "{{ rhev_url }}"
+          username: "{{ rhev_username }}"
+          password: "{{ rhev_password }}"
+          insecure: true
+        name: "{{ vm_name }}"
+        state: running
+      register: vm_started
+    - name: Desligar a VM
+      ovirt.ovirt.ovirt_vm:
+        auth:
+          url: "{{ rhev_url }}"
+          username: "{{ rhev_username }}"
+          password: "{{ rhev_password }}"
+          insecure: true
+        name: "{{ vm_name }}"
+        state: stopped
+      register: vm_stopped
+    - name: Iniciar a VM
+      ovirt.ovirt.ovirt_vm:
+        auth:
+          url: "{{ rhev_url }}"
+          username: "{{ rhev_username }}"
+          password: "{{ rhev_password }}"
+          insecure: true
+        name: "{{ vm_name }}"
+        state: running
+      register: vm_started

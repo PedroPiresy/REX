@@ -1,0 +1,29 @@
+# vars/storage_domains.yml
+# Samples
+search_queries_engine:
+  - "datadomain-dc1-alpha01"
+  - "datadomain-dc1-alpha02"
+  - "datadomain-dc1-alpha03"
+
+search_queries_engine1:
+  - "datadomain-dc1-gamma01"
+  - "datadomain-dc1-alpha01"
+  - "datadomain-dc1-alpha02"
+
+search_queries_olvm:
+  - "datadomain-delta01"
+  - "datadomain-alpha01"
+  - "datadomain-alpha03"
+
+search_queries_olvm1:
+  - "datadomain-dc1-alpha01"
+  - "datadomain-dc1-alpha02"
+  - "datadomain-dc1-alpha03"
+
+search_queries_olvm2:
+  - "datadomain-dc1-alpha01"
+  - "datadomain-dc1-alpha02"
+  - "datadomain-dc1-alpha03"
+
+# Variável para armazenar a lista com base na URL
+search_queries: []

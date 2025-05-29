@@ -1,0 +1,45 @@
+nics_config:
+  HML:
+    - name: "enp1s0"
+      profile_name: "net-hml-app"
+      interface: virtio
+  HML_OLVM:
+    - name: "enp1s0"
+      profile_name: "net-hml-olvm"
+      interface: virtio
+  HML_sec:
+    - name: "enp3s0"
+      profile_name: "net-hml-sec"
+      interface: virtio
+  DB_HML:
+    - name: "enp4s0"
+      profile_name: "net-hml-db"
+      interface: virtio
+  PRD:
+    - name: "enp1s0"
+      profile_name: "net-prd-app"
+      interface: virtio
+  PRD_OLVM:
+    - name: "enp1s0"
+      profile_name: "net-prd-olvm"
+      interface: virtio
+  PRD_sec:
+    - name: "enp3s0"
+      profile_name: "net-prd-sec"
+      interface: virtio
+  DB_PRD:
+    - name: "enp4s0"
+      profile_name: "net-prd-db"
+      interface: virtio
+  RMI:
+    - name: "enp1s0"
+      profile_name: "net-rmi-main"
+      interface: virtio
+  RMI_sec:
+    - name: "enp3s0"
+      profile_name: "net-rmi-sec"
+      interface: virtio
+  BKP:
+    - name: "enp5s0"
+      profile_name: "net-backup"
+      interface: virtio
